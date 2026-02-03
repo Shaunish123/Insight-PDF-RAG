@@ -9,7 +9,7 @@ Created the folder and file elementary structure
 
 **Goal:** Implement the basic RAG pipeline (Ingestion + Retrieval) in Python.
 
-![alt text](image.png)
+![alt text](/images/image.png)
 
 ### Things I Learned
 
@@ -128,12 +128,12 @@ I didn't need to build a frontend website to test my code. FastAPI has a built-i
 3. I went to the `/chat` section and sent a JSON question: `{ "question": "What are the major differences in Plant vs Animal cells?" }`
 4. Gemini answered correctly based only on the PDF I uploaded!
 
-![Response code if upload is successful](image-1.png)
+![Response code if upload is successful](/images/image-1.png)
 
 below are the question and answers 
 
-![Question Body](image-2.png)
-![Answer Response](image-3.png)
+![Question Body](/images/image-2.png)
+![Answer Response](/images/image-3.png)
 
 
 
