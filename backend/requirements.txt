@@ -6,3 +6,7 @@ langchain-chroma
 pypdf
 python-dotenv
 sentence-transformers
+
+fastapi 
+uvicorn 
+python-multipart

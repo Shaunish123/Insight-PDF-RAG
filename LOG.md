@@ -5,7 +5,7 @@ Created the folder and file elementary structure
 
 ---
 
-## [Date: 02-02-2025] - Session 1: The AI Core
+## [Date: 02-02-2026] - Session 1: The AI Core
 
 **Goal:** Implement the basic RAG pipeline (Ingestion + Retrieval) in Python.
 
@@ -74,6 +74,66 @@ Question → Find Relevant Chunks → Build Prompt → Ask Gemini → Get Answer
 
 
 _**Note:** `RunnablePassthrough()` just passes your original question through unchanged so it can be inserted into the prompt template alongside the retrieved chunks._
+
+---
+
+## [Date: 03-02-2026] - Session 2: The Systems Bridge (FastAPI)
+
+**Goal:** Turn the Python script into a Web API that can accept files and questions from the outside world.
+
+### Things I Learned
+
+#### 1. Why FastAPI?
+I chose FastAPI over other options (like Flask or Django) because:
+
+- **Speed** - It is incredibly fast
+- **Async/Await** - It can handle a file upload in the background while simultaneously answering a chat question. It doesn't freeze up
+- **Auto-Documentation** - It automatically writes the instruction manual (Swagger UI) for my API, saving me hours of work
+
+#### 3. Pydantic
+This is the "Bouncer" at the club. Python is usually loose with data types, but Pydantic enforces strict rules. If I say `question: str`, and someone sends a number, Pydantic stops them at the door. It prevents my code from crashing due to bad input.
+
+---
+
+### How I Built It (main.py)
+I wrapped my RAG engine in a web server. Here is the human-readable logic:
+
+#### The Setup
+I initialized the FastAPI app and started my RagEngine once at the top. This keeps the "Brain" alive so it doesn't have to wake up from scratch for every single user.
+
+#### The "Upload" Route (POST /upload)
+
+- **Input:** A file (specifically a PDF)
+- **The Problem:** Files sent over the internet arrive as "streams" (packets of data in RAM). My PDF reader needs a real file on the hard drive
+- **The Fix:** I used shutil to copy the stream from RAM to a temporary file on the disk (temp.pdf)
+- **The Action:** I told the engine to read that temp file, then immediately deleted it to keep the server clean
+
+#### The "Chat" Route (POST /chat)
+
+- **Input:** A strict JSON object: `{ "question": "..." }`
+- **The Action:** It takes the text string, passes it to `rag_engine.chat()`, and returns the answer as JSON
+
+---
+
+### How I Tested It (Swagger UI)
+I didn't need to build a frontend website to test my code. FastAPI has a built-in feature called Swagger UI.
+
+- **What it is:** A visual dashboard that reads my code and automatically generates buttons for every function I wrote
+- **URL:** http://localhost:8000/docs
+
+#### My Test:
+
+1. I went to the `/upload` section and uploaded a [sample PDF](backend/sample.pdf) it is a PDF about cells of plants and animals
+2. I received a 200 OK success message
+3. I went to the `/chat` section and sent a JSON question: `{ "question": "What are the major differences in Plant vs Animal cells?" }`
+4. Gemini answered correctly based only on the PDF I uploaded!
+
+![Response code if upload is successful](image-1.png)
+
+below are the question and answers 
+
+![Question Body](image-2.png)
+![Answer Response](image-3.png)
 
 
 
