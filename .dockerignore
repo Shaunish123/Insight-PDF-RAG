@@ -1,0 +1,25 @@
+# Ignore local environments
+.venv/
+node_modules/
+
+# Ignore git history
+.git
+.gitignore
+
+# Ignore build outputs
+.next/
+__pycache__/
+build/
+dist/
+
+# Ignore secrets (You will pass these via 'env_file' in docker-compose)
+.env
+.env.local
+
+# Ignore local data
+chroma_db/
+data/
+
+# Misc
+README.md
+.dockerignore

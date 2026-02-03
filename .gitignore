@@ -1,0 +1,33 @@
+# Environment Secrets (CRITICAL)
+.env
+.env.local
+.env*.local
+
+# Python / FastAPI
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.mypy_cache/
+
+# AI / Vector DB Specific
+# This prevents uploading your massive local database to GitHub
+chroma_db/
+data/
+*.log
+vector_store/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+build/
+.DS_Store
+*.pem
+
+# IDEs
+.vscode/
+.idea/
