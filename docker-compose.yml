@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    container_name: insight-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      # Mount the chroma_db directory so data persists
+      - ./backend/chroma_db:/app/chroma_db
+    environment:
+      - ANONYMIZED_TELEMETRY=False
+    restart: unless-stopped

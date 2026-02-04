@@ -3,6 +3,9 @@
 import os
 from dotenv import load_dotenv
 
+# Disable ChromaDB telemetry to avoid warnings
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
+
 # Loaders and Splitters for loading the docs
 # and splitting into chunks or figuratively "index cards"
 from langchain_community.document_loaders import PyPDFLoader

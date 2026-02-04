@@ -12,7 +12,11 @@ app = FastAPI(title = "InsightPDF API")
 # CORS settings to allow frontend access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"], # Allow Next.js
+    allow_origins=[
+        "http://localhost:3000",  # Local development
+        "https://*.vercel.app",   # Vercel preview deployments
+        # Add your production Vercel domain here when deployed
+    ],
     allow_credentials=True,
     allow_methods=["*"], # Allow all verbs (GET, POST, etc.)
     allow_headers=["*"],
@@ -82,8 +86,23 @@ async def chat(request: QueryRequest):
     """
 
     try:
+        # Check if vector store has any documents
+        collection = rag_engine.vector_store._collection
+        count = collection.count()
+        
+        if count == 0:
+            raise HTTPException(
+                status_code=400, 
+                detail="No PDF has been uploaded yet. Please upload a PDF first."
+            )
+        
         response = rag_engine.chat(request.question, request.history)
         return {"answer": response}
     
+    except HTTPException:
+        raise
     except Exception as e:
+        import traceback
+        print(f"Chat error: {str(e)}")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))

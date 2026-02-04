@@ -1,4 +1,5 @@
 # Ignore local environments
+venv
 .venv/
 node_modules/
 
@@ -23,3 +24,5 @@ data/
 # Misc
 README.md
 .dockerignore
+
+*.pyc
