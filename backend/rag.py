@@ -19,14 +19,18 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 
 # Prompts and parsers
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
+
+from langchain.chains import create_history_aware_retriever, create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
 
 load_dotenv()
 
 class RagEngine:
     def __init__(self, db_path = "./chroma_db"):
+        self.db_path = db_path
         # we run our huggingface model for translating words
         # into numbers => Embeddings
         # this will run on our local CPU
@@ -39,7 +43,7 @@ class RagEngine:
         # answers, exactly accordin to our text
         print("Initialising LLM ...")
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash",
+            model="gemini-2.5-flash-lite",
             temperature=0
         )
 
@@ -49,14 +53,23 @@ class RagEngine:
             embedding_function = self.embeddings 
         )
 
-        # turning the cabinet into a "Retriever" to look things up
-        # k = 3 means "find the top 3 most relevant chunks or index cards"
-        self.retriever = self.vector_store.as_retriever(
-            search_type = "similarity",
-            search_kwargs = {"k": 3}
+
+    # wipes db to prevent mixing old and new data
+    def clear_database(self):
+        print("--- Clearing Database ---")
+        # 1. Force the vector store to reset
+        self.vector_store.delete_collection() 
+        # 2. Re-initialize it
+        self.vector_store = Chroma(
+            persist_directory=self.db_path, 
+            embedding_function=self.embeddings
         )
+        print("--- Database Cleared ---")
 
     def ingest_pdf(self, file_path):
+        # 1. CLEAR OLD DATA FIRST
+        self.clear_database()
+
         print(f"Loading PDF: {file_path}")
 
         # read the PDF
@@ -79,46 +92,52 @@ class RagEngine:
         self.vector_store.add_documents(splits)
         print("Saved to Store")
 
-    def chat(self, question):
-        # create a prompt template
+    def chat(self, question, chat_history=[]):
+        # # turning the cabinet into a "Retriever" to look things up
+        # # k = 3 means "find the top 3 most relevant chunks or index cards"
 
-        # {context} will be the retrieved chunks from the db
-        # {question} will be the user question
+        self.retriever = self.vector_store.as_retriever(search_kwargs={"k": 3})
 
-        template = """ You are a helpful assistant who is an expert in answering questions based on the context provided. 
-        Use the context to provide accurate answers. If you don't know the answer, just say that you don't know. Do not make up answers.
-        
-        Context: {context}
-        Question: {question}
-        """
+        # we contextualise a question so if user asks "explain it" then 
+        # what we'll do is ask ai to rewrite the question based on history
 
-        prompt = ChatPromptTemplate.from_template(template)
+        contextualize_q_system_prompt = """Given a chat history and the latest user question 
+        which might reference context in the chat history, formulate a standalone question 
+        which can be understood without the chat history. Do NOT answer the question, 
+        just reformulate it if needed and otherwise return it as is."""
 
-        # Build pipeline / chain
-        # retreive -> prompt -> llm -> answer
-        chain = (
-            {"context": self.retriever, "question": RunnablePassthrough()}
-            | prompt
-            | self.llm
-            | StrOutputParser()
+        contextualize_q_prompt = ChatPromptTemplate.from_messages([
+            ("system", contextualize_q_system_prompt),
+            MessagesPlaceholder("chat_history"),
+            ("human", "{input}"),
+        ])
+
+        history_aware_retriever = create_history_aware_retriever(
+            self.llm, self.retriever, contextualize_q_prompt
         )
 
-        return chain.invoke(question)
+        # --- STEP 2: Answer the Question ---
+        qa_system_prompt = """You are an assistant for question-answering tasks. 
+        Use the following pieces of retrieved context to answer the question. 
+        If you don't know the answer, just say that you don't know. 
+        
+        Context: {context}"""
+        
+        qa_prompt = ChatPromptTemplate.from_messages([
+            ("system", qa_system_prompt),
+            MessagesPlaceholder("chat_history"),
+            ("human", "{input}"),
+        ])
+        
+        question_answer_chain = create_stuff_documents_chain(self.llm, qa_prompt)
+        rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
 
-    
-    def _format_docs(self, docs):
-        # helper to join chunks into a single string
-        return "\n\n".join(doc.page_content for doc in docs)
+        # --- Execute ---
+        response = rag_chain.invoke({"input": question, "chat_history": chat_history})
+        return response["answer"]
     
 if __name__ == "__main__":
     engine = RagEngine()
-
-    # test 1 ingest 
-    engine.ingest_pdf("sample.pdf")
-
-    # test 2 ask
-    response = engine.chat("What are the major differences in Plant vs Animal cells?")
-    print("\nGemini says:\n", response)
 
         
 

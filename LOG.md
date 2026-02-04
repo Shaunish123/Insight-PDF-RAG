@@ -136,8 +136,115 @@ below are the question and answers
 ![Answer Response](/images/image-3.png)
 
 
+---
 
+## [Date: 04-02-2026] - Session 3: The Full Stack & Intelligence Upgrade
 
+**Goal:** Transform the raw API into a complete, user-friendly "Copilot" application with a real interface, memory, and split-screen workflow.
+
+---
+
+### Things I Learned
+
+#### Contextual RAG
+A simple "search" isn't enough. If I ask "Explain that," the AI needs to know what "that" refers to. The problem was that my chatbot had amnesia - every question felt like the first time we met.
+
+I learned how to use a **Conversational Retrieval Chain** which rewrites my questions based on conversation history before searching the database. This means if I ask "What's a mitochondria?" and then follow up with "Explain that in simpler terms," the AI knows "that" = "mitochondria."
+
+---
+
+### How I Built It
+
+#### Step 1: The Frontend Formation (The Shell)
+I moved from Python to **React/Next.js** to build the visual interface.
+
+**Component Architecture:** I broke the UI into small Lego blocks in `frontend/components`:
+
+- **Header.tsx:** Simple top navigation bar. Nothing fancy, just the app name and a clean header.
+
+- **PDFViewer.tsx:** This was cool! I used a native HTML `<iframe />` to render the PDF blob locally. The file never leaves the user's computer - no external cloud needed. Privacy first!
+
+- **ChatInterface.tsx:** This was the complex part. It handles the message list (user messages vs AI responses), the text input field, send button, and auto-scrolling to the latest message. I spent hours getting the auto-scroll to work smoothly.
+
+**The Layout (page.tsx):** I used **Tailwind CSS Flexbox** to create a responsive split-screen layout that adjusts to the screen size. On desktop, you get the PDF on the left and chat on the right. On mobile, it stacks vertically.
+
+**The Landing Page:** I added a "Welcome State" that shows a clean upload card with instructions. It only transitions into the full workspace view after a file is selected. This makes the app feel more polished instead of showing an empty broken screen.
+
+#### Step 2: The Wiring (Connecting Front & Back)
+Now I had two systems - the Python backend and the React frontend - but they couldn't talk to each other yet. Time to build the bridge.
+
+**Backend Update (main.py):** I added **CORSMiddleware** to allow requests from `localhost:3000` (where my frontend runs). Without this, browsers block the requests for security reasons. CORS is basically telling the browser "hey, these two apps are friends, let them talk."
+
+**API Client (api.ts):** Instead of writing messy `fetch` calls everywhere in my React components, I built a dedicated **Axios client** to handle:
+
+- **Multipart file uploads** - Special formatting needed to send PDFs
+- **JSON chat requests** - Clean structured data for questions and answers
+
+This keeps my code organized. If I need to change the API URL later, I only update it in one place.
+
+**Feedback Loops:** I added loading states (`isUploading`, `isThinking`) to `ChatInterface.tsx`. Now when you upload a file or ask a question, the user sees a spinner instead of a frozen screen. Small detail, huge difference in user experience.
+
+#### Step 3: The Intelligence Upgrade (Memory)
+I went back to the Python core (`rag.py`) to make the AI actually smart about conversations.
+
+**Session Isolation:** I added a `clear_database()` function. Now, every time you upload a new file, it wipes the old data from ChromaDB. This prevents the AI from getting confused and mixing up information from different documents. Each upload is a fresh start.
+
+**History Awareness:** I upgraded the RAG pipeline to use `create_history_aware_retriever`. This was the big brain upgrade.
+
+- **Old Way:** Question → Search → Answer
+- **New Way:** History + Question → Rewrite Question → Search → Answer
+
+**Example of how this helps:**
+- User: "What is photosynthesis?"
+- AI: "It's how plants make food using sunlight..."
+- User: "How does that work in detail?"
+- Without history: AI searches for "that" (finds nothing relevant)
+- With history: AI rewrites to "How does photosynthesis work in detail?" (finds perfect context)
+
+**History Passing:** I updated the frontend to slice the last 6 messages and send them to the backend with every new request. Why only 6? Because sending the entire conversation would be slow and expensive. 6 messages is enough context without bloating the API calls.
+
+#### Step 4: Polish & Stability (The Final Bosses)
+This is where I learned that building something is 20% of the work. Making it actually work reliably is the other 80%. I encountered real-world engineering problems:
+
+**Dependency Hell:** My Python environment broke due to version conflicts between LangChain packages. Some tutorials online use old versions, some use new ones, and mixing them crashes everything. 
+
+**The Fix:** I deleted the entire `venv`, created a fresh `requirements.txt` with the modern **LangChain v0.2 stack**, and fixed all the imports. I documented every version number so future me doesn't face the same nightmare.
+
+**Rate Limits:** I hit Google's free tier limit (429 Error) while testing. Turns out `gemini-2.5-flash` has stricter limits.
+
+**The Fix:** I switched to the stable `gemini-2.5-flash-lite` model. It is extremely fast and has generous limits. For a student project, this trade-off makes sense.
+
+**Markdown Support:** The AI was returning nice formatted text with bullet points and bold text, but it was showing up as raw markdown symbols (`**bold**`, `- item`) in the chat.
+
+**The Fix:** I installed `react-markdown` in the frontend. Now the AI's responses render beautifully - bold text is actually bold, lists are properly formatted, code blocks look professional.
+
+**Resizable UI:** I added a "Power User" feature where you can press **Ctrl + Arrow Keys** to dynamically resize the PDF panel width using React state. This was a fun touch - if you want more PDF space, press Ctrl+Right. More chat space? Ctrl+Left. It uses browser `localStorage` to remember your preference even after closing the tab.
+---
+
+![A look at the website](./images/image-4.png)
+
+## [Date: 04-02-2026] - Bug Fix: Duplicate Upload Prevention
+
+**Problem:** When uploading a PDF, I noticed the success message appeared twice in the chat, and the backend was processing the same file twice. This was wasteful and confusing.
+
+**Root Cause:** React 18's Strict Mode intentionally runs `useEffect` hooks twice in development mode to help catch bugs. My upload logic lived inside a `useEffect`, so it triggered twice.
+
+**The Fix:** I added a `useRef` to track whether the upload already happened:
+```tsx
+const hasUploadedRef = useRef(false);
+```
+
+Now the upload check looks like:
+```tsx
+if (initialFile && !hasUploadedRef.current) {
+  hasUploadedRef.current = true;
+  handleUpload(initialFile);
+}
+```
+
+**Why useRef?** Unlike `useState`, `useRef` doesn't trigger re-renders and persists across React's double-invocation in Strict Mode. This is the proper React way to handle "run once" side effects.
+
+**Result:** Upload now happens exactly once, even in development mode. Chat stays clean, and I save unnecessary API calls.
 
 
 

@@ -4,8 +4,19 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
 from rag import RagEngine
 
+from fastapi.middleware.cors import CORSMiddleware 
+
 # Initialize FastAPI app
 app = FastAPI(title = "InsightPDF API")
+
+# CORS settings to allow frontend access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"], # Allow Next.js
+    allow_credentials=True,
+    allow_methods=["*"], # Allow all verbs (GET, POST, etc.)
+    allow_headers=["*"],
+)
 
 # Initialize RAG Engine
 rag_engine = RagEngine()
@@ -16,6 +27,8 @@ rag_engine = RagEngine()
 
 class QueryRequest(BaseModel):
     question: str
+    # History is a list of ["human", "message"] or ["ai", "message"] pairs
+    history: list[tuple[str, str]] = []
 
 
 # ROUTES 
@@ -69,7 +82,7 @@ async def chat(request: QueryRequest):
     """
 
     try:
-        response = rag_engine.chat(request.question)
+        response = rag_engine.chat(request.question, request.history)
         return {"answer": response}
     
     except Exception as e:
