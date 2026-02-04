@@ -219,6 +219,7 @@ This is where I learned that building something is 20% of the work. Making it ac
 **The Fix:** I installed `react-markdown` in the frontend. Now the AI's responses render beautifully - bold text is actually bold, lists are properly formatted, code blocks look professional.
 
 **Resizable UI:** I added a "Power User" feature where you can press **Ctrl + Arrow Keys** to dynamically resize the PDF panel width using React state. This was a fun touch - if you want more PDF space, press Ctrl+Right. More chat space? Ctrl+Left. It uses browser `localStorage` to remember your preference even after closing the tab.
+
 ---
 
 ![A look at the website](./images/image-4.png)
