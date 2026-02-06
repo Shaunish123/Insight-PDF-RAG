@@ -12,9 +12,9 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # AI Models 
-# Gemini for BRAIN
+# GROQ for BRAIN (Fast & Free LLM API)
 # HuggingFace for EMBEDDINGS
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
 
 # Vector Database Store 
@@ -25,6 +25,7 @@ from langchain_chroma import Chroma
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.messages import HumanMessage, AIMessage
 
 from langchain.chains import create_history_aware_retriever, create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
@@ -41,13 +42,15 @@ class RagEngine:
         print("Initialising Embeddings ...")
         self.embeddings = HuggingFaceEmbeddings(model_name = "all-MiniLM-L6-v2")
 
-        # now setup the brain => GEMINI
+        # now setup the brain => GROQ
         # set temp = 0, so it gives us factual 
-        # answers, exactly accordin to our text
+        # answers, exactly according to our text
+        # Using llama-3.3-70b-versatile for powerful reasoning
         print("Initialising LLM ...")
-        self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash-lite",
-            temperature=0
+        self.llm = ChatGroq(
+            model="llama-3.3-70b-versatile",
+            temperature=0,
+            api_key=os.getenv("GROQ_API_KEY")
         )
 
         # setting up the vector DB - the filling cabinet
@@ -60,8 +63,12 @@ class RagEngine:
     # wipes db to prevent mixing old and new data
     def clear_database(self):
         print("--- Clearing Database ---")
-        # 1. Force the vector store to reset
-        self.vector_store.delete_collection() 
+        try:
+            # 1. Force the vector store to reset
+            self.vector_store.delete_collection() 
+        except Exception as e:
+            print(f"Note: {e} (this is normal for first upload)")
+        
         # 2. Re-initialize it
         self.vector_store = Chroma(
             persist_directory=self.db_path, 
@@ -101,6 +108,16 @@ class RagEngine:
 
         self.retriever = self.vector_store.as_retriever(search_kwargs={"k": 3})
 
+        # Convert tuple-based history to LangChain message objects
+        # API sends [("human", "text"), ("ai", "text")]
+        # LangChain expects [HumanMessage(...), AIMessage(...)]
+        formatted_history = []
+        for role, content in chat_history:
+            if role == "human":
+                formatted_history.append(HumanMessage(content=content))
+            elif role == "ai":
+                formatted_history.append(AIMessage(content=content))
+
         # we contextualise a question so if user asks "explain it" then 
         # what we'll do is ask ai to rewrite the question based on history
 
@@ -122,7 +139,8 @@ class RagEngine:
         # --- STEP 2: Answer the Question ---
         qa_system_prompt = """You are an assistant for question-answering tasks. 
         Use the following pieces of retrieved context to answer the question. 
-        If you don't know the answer, just say that you don't know. 
+        If you don't know the answer, just say that you don't know. Other than that, do not
+        make up answers. Only use the context provided. 
         
         Context: {context}"""
         
@@ -136,7 +154,7 @@ class RagEngine:
         rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
 
         # --- Execute ---
-        response = rag_chain.invoke({"input": question, "chat_history": chat_history})
+        response = rag_chain.invoke({"input": question, "chat_history": formatted_history})
         return response["answer"]
     
 if __name__ == "__main__":

@@ -52,9 +52,13 @@ export default function ChatInterface({ initialFile }: Props) {
         ...prev,
         { role: "ai", content: `✅ **${file.name}** processed! I am ready.` },
       ]);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Failed to upload PDF.");
+      const errorMsg = error.response?.data?.detail || error.message || "Unknown error occurred";
+      setMessages((prev) => [
+        ...prev,
+        { role: "ai", content: `❌ **Upload Failed:** ${errorMsg}\n\nPlease check that:\n- File is a valid PDF\n- File size is under 50MB\n- Backend server is running` },
+      ]);
     } finally {
       setIsUploading(false);
     }
@@ -79,11 +83,24 @@ const handleSendMessage = async () => {
       const data = await chatWithPDF(question, history);
       
       setMessages((prev) => [...prev, { role: "ai", content: data.answer }]);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      const errorMsg = error.response?.data?.detail || error.message || "Unknown error";
+      const statusCode = error.response?.status;
+      
+      let userMessage = `❌ **Error:** ${errorMsg}`;
+      
+      if (statusCode === 400) {
+        userMessage += "\n\n💡 **Tip:** Make sure you've uploaded a PDF first.";
+      } else if (statusCode === 500) {
+        userMessage += "\n\n⚠️ The server encountered an error. Please try again or upload a different PDF.";
+      } else if (!statusCode) {
+        userMessage = "❌ **Connection Error:** Cannot reach the server.\n\n🔌 Please check that the backend is running on port 8000.";
+      }
+      
       setMessages((prev) => [
         ...prev, 
-        { role: "ai", content: "❌ Error connecting to server." }
+        { role: "ai", content: userMessage }
       ]);
     } finally {
       setIsThinking(false);
@@ -98,13 +115,13 @@ const handleSendMessage = async () => {
   };
 
   return (
-    <div className="w-full flex flex-col h-full bg-white relative">
+    <div className="w-full flex flex-col h-full bg-white dark:bg-gray-900 relative transition-colors">
       {/* Loading Overlay */}
       {isUploading && (
-        <div className="absolute inset-0 bg-white/90 flex items-center justify-center z-20">
+        <div className="absolute inset-0 bg-white/90 dark:bg-gray-900/90 flex items-center justify-center z-20 cursor-wait">
           <div className="flex flex-col items-center gap-2">
-            <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-            <p className="text-sm font-medium text-gray-600">Analyzing Document...</p>
+            <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Analyzing Document...</p>
           </div>
         </div>
       )}
@@ -114,18 +131,18 @@ const handleSendMessage = async () => {
         {messages.map((msg, index) => (
           <div key={index} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             <div className={`flex items-start gap-3 max-w-[85%] ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${msg.role === "user" ? "bg-blue-600 text-white" : "bg-orange-500 text-white"}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${msg.role === "user" ? "bg-blue-600 dark:bg-blue-500 text-white" : "bg-orange-500 dark:bg-orange-600 text-white"}`}>
                 {msg.role === "user" ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
               </div>
 
-              <div className={`p-4 rounded-lg text-sm leading-relaxed ${msg.role === "user" ? "bg-blue-50 text-blue-900 rounded-tr-none" : "bg-gray-100 text-gray-800 rounded-tl-none"}`}>
+              <div className={`p-4 rounded-lg text-sm leading-relaxed ${msg.role === "user" ? "bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100 rounded-tr-none" : "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-tl-none"}`}>
                 {/* --- NEW: MARKDOWN RENDERER --- */}
                 {msg.role === "ai" ? (
-                  <div className="prose prose-sm max-w-none text-gray-800">
+                  <div className="prose prose-sm max-w-none text-gray-800 dark:text-gray-200">
                     <ReactMarkdown
                       components={{
                         p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
-                        strong: ({node, ...props}) => <span className="font-bold text-gray-900" {...props} />,
+                        strong: ({node, ...props}) => <span className="font-bold text-gray-900 dark:text-white" {...props} />,
                         ul: ({node, ...props}) => <ul className="list-disc ml-4 mb-2" {...props} />,
                         li: ({node, ...props}) => <li className="mb-1" {...props} />,
                       }}
@@ -141,7 +158,7 @@ const handleSendMessage = async () => {
           </div>
         ))}
         {isThinking && (
-          <div className="flex items-center gap-2 text-gray-400 text-sm ml-12">
+          <div className="flex items-center gap-2 text-gray-400 dark:text-gray-500 text-sm ml-12">
             <Loader2 className="w-4 h-4 animate-spin" />
             <span>Thinking...</span>
           </div>
@@ -150,7 +167,7 @@ const handleSendMessage = async () => {
       </div>
 
       {/* Input Area */}
-      <div className="p-4 border-t bg-gray-50">
+      <div className="p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800 transition-colors">
         <div className="flex gap-2">
           <input
             type="text"
@@ -158,10 +175,10 @@ const handleSendMessage = async () => {
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask a question..."
-            className="flex-1 px-4 py-2 border rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 px-4 py-2 border dark:border-gray-600 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
             disabled={isUploading || isThinking}
           />
-          <button onClick={handleSendMessage} disabled={isUploading || !inputValue.trim()} className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition">
+          <button onClick={handleSendMessage} disabled={isUploading || !inputValue.trim()} className="p-2 bg-blue-600 dark:bg-blue-500 text-white rounded-full hover:bg-blue-700 dark:hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
             <Send className="w-5 h-5" />
           </button>
         </div>

@@ -1,5 +1,7 @@
 import os
 import shutil
+import tempfile
+import re
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
 from rag import RagEngine
@@ -47,34 +49,89 @@ def home():
 async def upload_doc(file: UploadFile = File(...)):
     """
     1. Receives file 
-    2. saves to disk temporarily
+    2. validates and saves to disk temporarily
     3. feeds to RAG engine for ingestion
-    
+    4. cleans up temp file
     """
 
-    # validate if pdf
+    # Validate filename exists
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided. Please select a valid PDF file.")
+
+    # Validate if PDF
     if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code = 400, detail = "Only PDF files are allowed")
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid file type '{file.filename.split('.')[-1]}'. Only PDF files are supported."
+        )
 
-    # save to disk
-    temp_filename = f"temp_{file.filename}"
+    # Sanitize filename (remove special characters, keep alphanumeric and basic chars)
+    safe_filename = re.sub(r'[^\w\s.-]', '', file.filename)
+    safe_filename = safe_filename.replace(' ', '_')
 
+    # Check file size (50 MB limit)
+    MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB in bytes
+    file.file.seek(0, 2)  # Seek to end
+    file_size = file.file.tell()  # Get size
+    file.file.seek(0)  # Reset to start
+    
+    if file_size == 0:
+        raise HTTPException(
+            status_code=400, 
+            detail="The uploaded file is empty (0 bytes). Please check the file and try again."
+        )
+    
+    if file_size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"File size ({file_size / (1024*1024):.1f} MB) exceeds maximum limit of 50 MB. Please compress or split your PDF."
+        )
+
+    # Create temp file with proper cleanup
+    temp_file = None
     try:
-        with open(temp_filename, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        # Create a temporary file that will be auto-deleted
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+        temp_path = temp_file.name
+        
+        # Write uploaded content to temp file
+        shutil.copyfileobj(file.file, temp_file)
+        temp_file.close()
 
-        # tell engine to read file
-        rag_engine.ingest_pdf(temp_filename)
+        # Tell engine to read file
+        rag_engine.ingest_pdf(temp_path)
 
-        os.remove(temp_filename) # remove temp file
+        # Clean up temp file
+        os.unlink(temp_path)
 
-        return {"filename": file.filename, "status": "Ingested Successfully"}
+        return {
+            "filename": file.filename, 
+            "status": "Ingested Successfully",
+            "size_mb": round(file_size / (1024*1024), 2)
+        }
 
     except Exception as e:
         # If anything fails, clean up and tell the user
-        if os.path.exists(temp_filename):
-            os.remove(temp_filename)
-        raise HTTPException(status_code=500, detail=str(e))
+        if temp_file and os.path.exists(temp_file.name):
+            try:
+                os.unlink(temp_file.name)
+            except:
+                pass
+        
+        import traceback
+        error_details = str(e)
+        print(f"Upload error: {error_details}")
+        print(traceback.format_exc())
+        
+        # Provide more helpful error messages
+        if "PyPDF" in error_details or "PDF" in error_details:
+            detail = f"Failed to read PDF file. The file may be corrupted or password-protected. Error: {error_details}"
+        elif "memory" in error_details.lower():
+            detail = "Insufficient memory to process this PDF. Try a smaller file or restart the server."
+        else:
+            detail = f"Failed to process PDF: {error_details}"
+        
+        raise HTTPException(status_code=500, detail=detail)
 
 
 @app.post("/chat")
@@ -93,7 +150,7 @@ async def chat(request: QueryRequest):
         if count == 0:
             raise HTTPException(
                 status_code=400, 
-                detail="No PDF has been uploaded yet. Please upload a PDF first."
+                detail="No document found in database. Please upload a PDF file before asking questions."
             )
         
         response = rag_engine.chat(request.question, request.history)

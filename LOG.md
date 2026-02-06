@@ -248,6 +248,119 @@ if (initialFile && !hasUploadedRef.current) {
 **Result:** Upload now happens exactly once, even in development mode. Chat stays clean, and I save unnecessary API calls.
 
 
+## [Date: 06-02-2026] - Enhancement: PDF Upload Robustness
+
+**Problem:** PDF upload functionality had several potential failure points and security issues.
+
+**Issues Identified:**
+1. **Improper temp file handling** - Files saved to current working directory, which may not be writable in Docker
+2. **No file validation** - Missing checks for empty files or actual PDF content
+3. **No size limits** - Could cause memory overflow with large files
+4. **Filename security** - Special characters in filenames could cause file system errors
+5. **Race conditions** - Simultaneous uploads with same filename would conflict
+6. **Database clearing errors** - `clear_database()` failed on first upload when collection doesn't exist
+
+**Solutions Implemented:**
+
+1. **Proper Temp File Handling** ([main.py](backend/main.py)):
+   ```python
+   temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+   ```
+   - Uses Python's `tempfile` module for OS-appropriate temp directory
+   - Guaranteed cleanup even on errors
+
+2. **Comprehensive Validation**:
+   - File size limit: 50 MB maximum
+   - Empty file check
+   - Extension validation (`.pdf` only)
+   - Filename sanitization (removes special characters)
+
+3. **Enhanced Error Handling**:
+   - Detailed error messages with file size info
+   - Proper cleanup in all error scenarios
+   - Better logging with traceback
+
+4. **Database Initialization Fix** ([rag.py](backend/rag.py)):
+   - Wrapped `delete_collection()` in try-except
+   - Handles first upload gracefully when no collection exists
+
+**Benefits:**
+- More reliable uploads in Docker environment
+- Better user feedback on upload issues
+- Protected against malicious or oversized files
+- No more race conditions or file conflicts
+
+---
+
+## [Date: 06-02-2026] - Bug Fix: Chat History Format Mismatch
+
+**Problem:** The application was returning 500 errors during chat interactions due to a format mismatch between the API layer and the RAG engine.
+
+**Root Cause:** 
+- The API ([main.py](backend/main.py)) sends chat history as a list of tuples: `[("human", "message"), ("ai", "response")]`
+- The RAG engine ([rag.py](backend/rag.py)) uses LangChain's `MessagesPlaceholder`, which expects actual message objects: `[HumanMessage(...), AIMessage(...)]`
+
+**Solution:**
+Implemented format conversion in the RAG engine's chat method:
+```python
+formatted_history = []
+for role, content in chat_history:
+    if role == "human":
+        formatted_history.append(HumanMessage(content=content))
+    elif role == "ai":
+        formatted_history.append(AIMessage(content=content))
+```
+
+**Why This Approach:**
+- Keeps the API simple (tuples are easier for frontend to work with)
+- Encapsulates LangChain-specific logic within the RAG module
+- No changes required to frontend or API interface
+- Clean separation of concerns
+
+---
+
+
+**Goal:** Switch from Google Gemini to GROQ API for faster, free LLM inference.
+
+### Why GROQ?
+
+**Advantages over Gemini:**
+1. **Speed** - GROQ's LPU (Language Processing Unit) delivers extremely fast inference
+2. **Free Tier** - Generous free API quota for development and testing
+3. **Powerful Models** - Access to Meta's Llama 3.3 70B model
+4. **Reliability** - High uptime and consistent performance
+
+### Implementation Changes:
+
+**1. Environment Variables** :
+```env
+GROQ_API_KEY="gsk_..."
+```
+
+**2. Dependencies** ([requirements.txt](backend/requirements.txt)):
+- Removed: `langchain-google-genai`
+- Added: `langchain-groq`
+
+**3. RAG Engine** ([rag.py](backend/rag.py)):
+```python
+# Old (Gemini):
+from langchain_google_genai import ChatGoogleGenerativeAI
+self.llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash-lite",
+    temperature=0
+)
+
+# New (GROQ):
+from langchain_groq import ChatGroq
+self.llm = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    temperature=0,
+    api_key=os.getenv("GROQ_API_KEY")
+)
+```
+
+---
+
 
 
 

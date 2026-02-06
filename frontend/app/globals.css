@@ -3,3 +3,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Enable dark mode class strategy */
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  
+  html.dark {
+    color-scheme: dark;
+  }
+}

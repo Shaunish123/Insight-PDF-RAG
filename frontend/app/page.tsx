@@ -82,7 +82,7 @@ export default function Home() {
   };
 
   return (
-    <main className="flex flex-col h-screen bg-gray-50">
+    <main className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
       <Header 
         hasActiveFile={!!activeFile}
         onUploadNew={handleUploadNew}
@@ -92,26 +92,26 @@ export default function Home() {
       {!activeFile ? (
         // --- LANDING PAGE (Restored) ---
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in duration-500">
-          <div className="bg-white p-10 rounded-2xl shadow-xl border border-gray-100 max-w-lg w-full">
-            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+          <div className="bg-white dark:bg-gray-800 p-10 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 max-w-lg w-full transition-colors">
+            <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mx-auto mb-6">
               <FileText className="w-8 h-8" />
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-3">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">
               Welcome to InsightPDF
             </h1>
-            <p className="text-gray-500 mb-8 leading-relaxed">
+            <p className="text-gray-500 dark:text-gray-400 mb-8 leading-relaxed">
               Upload your technical documents, research papers, or manuals. 
               Our AI will analyze them and answer your questions instantly.
             </p>
 
             {/* Upload Button */}
-            <label className="cursor-pointer group relative flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all">
+            <label className="cursor-pointer group relative flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 transition-all">
               <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                <UploadCloud className="w-8 h-8 text-gray-400 group-hover:text-blue-500 mb-2 transition" />
-                <p className="mb-2 text-sm text-gray-500 group-hover:text-blue-600 font-medium">
+                <UploadCloud className="w-8 h-8 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 mb-2 transition" />
+                <p className="mb-2 text-sm text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 font-medium">
                   Click to upload PDF
                 </p>
-                <p className="text-xs text-gray-400">PDF files up to 10MB</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">PDF files up to 50MB</p>
               </div>
               <input 
                 type="file" 
@@ -129,7 +129,7 @@ export default function Home() {
           {/* LEFT: PDF VIEWER (Dynamic Width) */}
           <div 
             style={{ width: `${pdfWidth}%` }} 
-            className="h-full transition-all duration-200 ease-in-out border-r border-gray-200"
+            className="h-full transition-all duration-200 ease-in-out border-r border-gray-200 dark:border-gray-700"
           >
             <PDFViewer fileUrl={activeFileUrl} />
           </div>
@@ -137,12 +137,12 @@ export default function Home() {
           {/* DRAGGER HANDLE (Visual Indicator) */}
           <div 
             className={`w-1 cursor-col-resize flex items-center justify-center z-10 transition-all ${
-              isDragging ? "bg-blue-500 w-2" : "bg-gray-200 hover:bg-blue-400"
+              isDragging ? "bg-blue-500 w-2" : "bg-gray-200 dark:bg-gray-700 hover:bg-blue-400 dark:hover:bg-blue-500"
             }`}
             onMouseDown={() => setIsDragging(true)}
           >
             <div className={`h-12 w-1 rounded-full transition-all ${
-              isDragging ? "bg-blue-600 w-1" : "bg-gray-400"
+              isDragging ? "bg-blue-600 w-1" : "bg-gray-400 dark:bg-gray-600"
             }`} />
           </div>
           
@@ -174,23 +174,23 @@ export default function Home() {
       
       {/* About Modal */}
       {showAbout && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowAbout(false)}>
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 cursor-wait" onClick={() => setShowAbout(false)}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full mx-4 p-6 cursor-default" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-gray-900">About InsightPDF</h2>
-              <button onClick={() => setShowAbout(false)} className="text-gray-400 hover:text-gray-600 transition">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">About InsightPDF</h2>
+              <button onClick={() => setShowAbout(false)} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition">
                 <X className="w-6 h-6" />
               </button>
             </div>
-            <div className="space-y-3 text-gray-600 text-sm">
+            <div className="space-y-3 text-gray-600 dark:text-gray-300 text-sm">
               <p>
-                <strong className="text-gray-900">InsightPDF</strong> is an AI-powered document assistant that helps you understand complex PDFs through natural conversation.
+                <strong className="text-gray-900 dark:text-white">InsightPDF</strong> is an AI-powered document assistant that helps you understand complex PDFs through natural conversation.
               </p>
               <p>
                 Built with <strong>Next.js</strong>, <strong>FastAPI</strong>, and <strong>Google Gemini AI</strong>, using advanced RAG (Retrieval Augmented Generation) technology.
               </p>
-              <div className="pt-4 border-t">
-                <p className="text-xs text-gray-500">Developed as a learning project • February 2026</p>
+              <div className="pt-4 border-t dark:border-gray-700">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Developed as a learning project • February 2026</p>
               </div>
             </div>
           </div>

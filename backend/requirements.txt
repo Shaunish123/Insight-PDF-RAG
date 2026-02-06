@@ -14,7 +14,7 @@ langchain==0.2.1
 langchain-community==0.2.1
 langchain-core==0.2.3
 langchain-text-splitters==0.2.0
-langchain-google-genai
+langchain-groq
 langchain-chroma
 langchain-huggingface
 
