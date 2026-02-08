@@ -154,7 +154,7 @@ async def chat(request: QueryRequest):
             )
         
         response = rag_engine.chat(request.question, request.history)
-        return response  # Now returns {"answer": "...", "sources": [...]}
+        return {"answer": response}
     
     except HTTPException:
         raise

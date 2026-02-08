@@ -36,12 +36,17 @@ export default function Header({ hasActiveFile, onUploadNew, onAbout }: HeaderPr
           </>
         )}
         <a 
-          href="https://github.com" 
-          target="_blank" 
+          href="https://github.com/Shaunish123/Insight-PDF-RAG" 
+          target="_blank"
+          rel="noopener noreferrer"
           className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition"
+          title="View Source Code"
         >
           <Github className="w-5 h-5" />
         </a>
+        <div className="text-xs text-gray-500 dark:text-gray-400">
+          Made with ❤️ by Shaunish Sharma
+        </div>
       </div>
     </header>
   );

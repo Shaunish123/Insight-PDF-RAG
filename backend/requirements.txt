@@ -16,5 +16,5 @@ langchain-core==0.2.3
 langchain-text-splitters==0.2.0
 langchain-groq
 langchain-chroma
-langchain-huggingface
+langchain-google-genai
 

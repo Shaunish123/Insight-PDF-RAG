@@ -361,6 +361,167 @@ self.llm = ChatGroq(
 
 ---
 
+## [Date: 08-02-2026] - Session 4: Production Ready & Final Enhancements
+
+**Goal:** Polish the application with deployment features, fix critical bugs, and prepare for Docker containerization.
+
+### Things I Learned
+
+#### Deployment Considerations
+When moving from local development to production, many hidden problems appear. Render's free tier has an ephemeral filesystem, meaning uploaded PDFs disappear when the server restarts. For a demo app, this is acceptable, but production apps need cloud vector databases like Pinecone or Supabase.
+
+#### Math Rendering in Web Apps
+LaTeX formulas require special plugins. ReactMarkdown needs `remark-math` and `rehype-katex` to convert `$E=mc^2$` into beautiful rendered equations. Without error handling (`throwOnError: false`), one bad formula can crash the entire UI.
+
+---
+
+### How I Built It
+
+#### Feature 1: Timeout Handling ([api.ts](frontend/lib/api.ts))
+**Problem:** Render's free tier "sleeps" after 15 minutes of inactivity and takes 30-50 seconds to wake up. The first API call would timeout.
+
+**Solution:** Added generous timeout to Axios client:
+```typescript
+const apiClient = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
+  timeout: 30000, // Wait 30 seconds for Render wake-up
+});
+```
+
+#### Feature 2: Enhanced Markdown Rendering ([ChatInterface.tsx](frontend/components/ChatInterface.tsx))
+**Problems:** 
+- Long URLs broke the chat bubble layout
+- Code blocks didn't wrap properly
+- No support for tables, blockquotes, or links
+- LaTeX math formulas crashed the app on syntax errors
+
+**Solutions:**
+1. **Word Breaking:** Added `break-words` and `break-all` classes to prevent overflow
+2. **Math Rendering:** Configured KaTeX with error tolerance:
+   ```tsx
+   rehypePlugins={[[rehypeKatex, { strict: false, throwOnError: false }]]}
+   ```
+3. **Complete Markdown Support:** Added custom components for tables, links, blockquotes, and horizontal rules
+4. **Scrollable Code:** Made code blocks scrollable with proper wrapping
+
+#### Feature 3: Strict PDF Context ([rag.py](backend/rag.py))
+**Problem:** When asked "What is a bird?" with a laser physics PDF, the AI used general knowledge instead of saying it didn't know.
+
+**Solution:** Rewrote the system prompt to be strict:
+```python
+qa_system_prompt = """You are a PDF document assistant. Your ONLY job is to answer questions based strictly on the provided context from the PDF.
+
+**CRITICAL RULES:**
+- ONLY answer if the information is in the context
+- If not found, respond: "I cannot find information about that in the uploaded PDF document."
+- DO NOT use general knowledge or training data
+```
+
+Now the AI stays focused on the document and admits when it doesn't know.
+
+#### Feature 4: Permanent Dark Mode ([layout.tsx](frontend/app/layout.tsx))
+**Problem:** The dark mode toggle wasn't working reliably due to React hydration issues.
+
+**Solution:** Removed the toggle entirely and made dark mode permanent:
+```tsx
+<html lang="en" className="dark">
+```
+
+Simplified the code and gave the app a consistent, professional dark theme.
+
+#### Feature 5: Embeddings Upgrade ([rag.py](backend/rag.py))
+**Change:** Switched from HuggingFace to Google Generative AI embeddings because Render has a free limit of 512MB:
+```python
+# Old:
+self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+
+# New:
+self.embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+```
+
+**Benefits:**
+- Higher quality semantic search
+- Cloud-based (no local CPU usage)
+- Better retrieval accuracy
+
+**Requirements:**
+- Added `GOOGLE_API_KEY` to `.env`
+- Updated `requirements.txt` with `langchain-google-genai`
+
+---
+
+### Deployment Preparation
+
+**Environment Variables Needed:**
+- **Backend (Render):**
+  - `GROQ_API_KEY` - For Llama 3.3 inference
+  - `GOOGLE_API_KEY` - For embeddings
+  - `PORT` - Set to 8000
+
+- **Frontend (Vercel):**
+  - `NEXT_PUBLIC_API_URL` - Backend URL from Render
+
+**Docker Readiness:**
+The application is now containerized with:
+- `backend/Dockerfile` - Python FastAPI service
+- `docker-compose.yml` - Multi-container orchestration
+
+**Known Limitations:**
+- ChromaDB data is ephemeral on Render (resets on redeploy)
+- First API call after sleep takes 30-50 seconds on free tier
+
+**Next Steps:**
+1. Test Docker containers locally
+2. Deploy backend to Render
+3. Deploy frontend to Vercel
+4. Configure environment variables in both platforms
+5. Test end-to-end in production
+
+---
+
+## [Date: 08-02-2026] - Enhancement: Model Rollback & Stability
+
+**Goal:** Implement automatic fallback mechanism to ensure the app never fails due to rate limits.
+
+### The Problem
+GROQ's free tier has rate limits. The powerful `llama-3.3-70b-versatile` model can hit quota limits during heavy usage, causing the app to crash with 429 errors.
+
+### The Solution: Smart Model Rollback
+
+Implemented a **try-catch with automatic fallback** in [rag.py](backend/rag.py#L164-L189):
+
+**Architecture:**
+1. **Primary Model:** `llama-3.3-70b-versatile` (smart, powerful, rate-limited)
+2. **Backup Model:** `llama-3.1-8b-instant` (fast, very high quota)
+3. **Helper Function:** `build_rag_chain(llm_instance)` - builds RAG chain with any LLM
+
+**Execution Flow:**
+```python
+try:
+    # Attempt with 70B model
+    response = rag_chain.invoke({...})
+except Exception as e:
+    if "429" or "rate limit" in error:
+        # Initialize 8B backup on the fly
+        backup_llm = ChatGroq(model="llama-3.1-8b-instant", ...)
+        # Retry with backup
+        response = rag_chain.invoke({...})
+    else:
+        raise e  # Other errors crash normally
+```
+
+**Benefits:**
+- ✅ **Zero downtime** - Users never see rate limit errors
+- ✅ **Best quality first** - Always tries the smarter model
+- ✅ **Graceful degradation** - Falls back seamlessly
+- ✅ **Clear logging** - Console shows which model answered
+- ✅ **No manual intervention** - Fully automatic
+
+**User Experience:**
+Users asking questions never know if they got the 70B or 8B response - the app just works! Only the backend logs show which model was used.
+
+---
+
 
 
 

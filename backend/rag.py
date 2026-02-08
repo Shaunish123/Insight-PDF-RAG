@@ -13,9 +13,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # AI Models 
 # GROQ for BRAIN (Fast & Free LLM API)
-# HuggingFace for EMBEDDINGS
+# Google Generative AI for EMBEDDINGS
 from langchain_groq import ChatGroq
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 # Vector Database Store 
 # ChromaDB acts as our "filling cabinet"
@@ -35,17 +35,18 @@ load_dotenv()
 class RagEngine:
     def __init__(self, db_path = "./chroma_db"):
         self.db_path = db_path
-        # we run our huggingface model for translating words
-        # into numbers => Embeddings
-        # this will run on our local CPU
+        # Google Generative AI embeddings for better quality
+        # Requires GOOGLE_API_KEY in .env
 
         print("Initialising Embeddings ...")
-        self.embeddings = HuggingFaceEmbeddings(model_name = "all-MiniLM-L6-v2")
+        self.embeddings = GoogleGenerativeAIEmbeddings(
+            model="models/gemini-embedding-001"
+        )
 
         # now setup the brain => GROQ
         # set temp = 0, so it gives us factual 
         # answers, exactly according to our text
-        # Using llama-3.3-70b-versatile for powerful reasoning
+        # Using llama-3.3-70b-versatile as primary (with 8b fallback)
         print("Initialising LLM ...")
         self.llm = ChatGroq(
             model="llama-3.3-70b-versatile",
@@ -103,14 +104,10 @@ class RagEngine:
         print("Saved to Store")
 
     def chat(self, question, chat_history=[]):
-        # # turning the cabinet into a "Retriever" to look things up
-        # # k = 3 means "find the top 3 most relevant chunks or index cards"
-
+        # 1. Setup Retrieval
         self.retriever = self.vector_store.as_retriever(search_kwargs={"k": 3})
 
-        # Convert tuple-based history to LangChain message objects
-        # API sends [("human", "text"), ("ai", "text")]
-        # LangChain expects [HumanMessage(...), AIMessage(...)]
+        # 2. Convert tuple-based history to LangChain message objects
         formatted_history = []
         for role, content in chat_history:
             if role == "human":
@@ -118,66 +115,85 @@ class RagEngine:
             elif role == "ai":
                 formatted_history.append(AIMessage(content=content))
 
-        # we contextualise a question so if user asks "explain it" then 
-        # what we'll do is ask ai to rewrite the question based on history
+        # --- HELPER FUNCTION: Builds the chain with a specific LLM ---
+        def build_rag_chain(llm_instance):
+            # Contextualize Question Prompt
+            contextualize_q_system_prompt = """Given a chat history and the latest user question 
+            which might reference context in the chat history, formulate a standalone question 
+            which can be understood without the chat history. Do NOT answer the question, 
+            just reformulate it if needed and otherwise return it as is."""
+            
+            contextualize_q_prompt = ChatPromptTemplate.from_messages([
+                ("system", contextualize_q_system_prompt),
+                MessagesPlaceholder("chat_history"),
+                ("human", "{input}"),
+            ])
+            
+            history_aware_retriever = create_history_aware_retriever(
+                llm_instance, self.retriever, contextualize_q_prompt
+            )
 
-        contextualize_q_system_prompt = """Given a chat history and the latest user question 
-        which might reference context in the chat history, formulate a standalone question 
-        which can be understood without the chat history. Do NOT answer the question, 
-        just reformulate it if needed and otherwise return it as is."""
+            # Answer Prompt
+            qa_system_prompt = """You are a PDF document assistant. Your ONLY job is to answer questions based strictly on the provided context from the PDF.
+            
+            **CRITICAL RULES:**
+            - ONLY answer questions if the information is present in the context below
+            - If the question cannot be answered using the context, respond EXACTLY with: "I cannot find information about that in the uploaded PDF document."
+            - DO NOT use your general knowledge or training data to answer questions
+            - DO NOT make assumptions or inferences beyond what is explicitly stated in the context
+            - You are NOT a general knowledge assistant - you are a PDF-specific assistant
+            
+            **Formatting Rules (only when answering from context):**
+            - Use **bold** for key terms and important concepts
+            - Use bullet points or numbered lists when listing items
+            - Use headings (##, ###) to organize longer responses
+            - Use code blocks with ``` for code snippets
+            - Use LaTeX for mathematical formulas: inline math with $formula$ and display math with $$formula$$
+            - Always provide properly formatted mathematical formulas when relevant, using LaTeX syntax. For example, write $E=mc^2$ for the mass-energy equivalence formula. Do NOT write it as plain text. Proper formatting is essential for clarity.
+            - **IMPORTANT:** Do NOT escape the dollar signs with backslashes. Write $x^2$, NOT \$x^2\$.
+            - Keep answers clear, well-structured, and easy to read
+            
+            Context: {context}"""
+            
+            qa_prompt = ChatPromptTemplate.from_messages([
+                ("system", qa_system_prompt),
+                MessagesPlaceholder("chat_history"),
+                ("human", "{input}"),
+            ])
+            
+            question_answer_chain = create_stuff_documents_chain(llm_instance, qa_prompt)
+            return create_retrieval_chain(history_aware_retriever, question_answer_chain)
 
-        contextualize_q_prompt = ChatPromptTemplate.from_messages([
-            ("system", contextualize_q_system_prompt),
-            MessagesPlaceholder("chat_history"),
-            ("human", "{input}"),
-        ])
+        # --- EXECUTION LOGIC (TRY 70B -> FALLBACK 8B) ---
+        try:
+            print("🧠 Attempting with Primary Model (llama-3.3-70b-versatile)...")
+            rag_chain = build_rag_chain(self.llm)  # Uses the 70b loaded in __init__
+            response = rag_chain.invoke({"input": question, "chat_history": formatted_history})
+            print("✅ Primary Model succeeded")
+        
+        except Exception as e:
+            error_msg = str(e).lower()
+            # Check for Rate Limit (429) or other API errors
+            if "429" in error_msg or "rate limit" in error_msg or "quota" in error_msg:
+                print(f"⚠️  Primary Model Rate Limited! Switching to Backup (llama-3.1-8b-instant)...")
+                
+                # Initialize Backup Model on the fly
+                backup_llm = ChatGroq(
+                    model="llama-3.1-8b-instant",
+                    temperature=0,
+                    api_key=os.getenv("GROQ_API_KEY")
+                )
+                
+                # Rebuild chain with backup model and Retry
+                rag_chain = build_rag_chain(backup_llm)
+                response = rag_chain.invoke({"input": question, "chat_history": formatted_history})
+                print("✅ Backup Model succeeded")
+            else:
+                # If it's a different error (e.g. API key invalid), crash normally
+                print(f"❌ Error: {e}")
+                raise e
 
-        history_aware_retriever = create_history_aware_retriever(
-            self.llm, self.retriever, contextualize_q_prompt
-        )
-
-        # --- STEP 2: Answer the Question ---
-        qa_system_prompt = """You are a PDF document assistant. Your ONLY job is to answer questions based strictly on the provided context from the PDF.
-        
-        **CRITICAL RULES:**
-        - ONLY answer questions if the information is present in the context below
-        - If the question cannot be answered using the context, respond EXACTLY with: "I cannot find information about that in the uploaded PDF document."
-        - DO NOT use your general knowledge or training data to answer questions
-        - DO NOT make assumptions or inferences beyond what is explicitly stated in the context
-        - You are NOT a general knowledge assistant - you are a PDF-specific assistant
-        
-        **Formatting Rules (only when answering from context):**
-        - Use **bold** for key terms and important concepts
-        - Use bullet points or numbered lists when listing items
-        - Use headings (##, ###) to organize longer responses
-        - Use code blocks with ``` for code snippets
-        - Use LaTeX for mathematical formulas: inline math with $formula$ and display math with $$formula$$
-        - Keep answers clear, well-structured, and easy to read
-        
-        Context: {context}"""
-        
-        qa_prompt = ChatPromptTemplate.from_messages([
-            ("system", qa_system_prompt),
-            MessagesPlaceholder("chat_history"),
-            ("human", "{input}"),
-        ])
-        
-        question_answer_chain = create_stuff_documents_chain(self.llm, qa_prompt)
-        rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
-
-        # --- Execute ---
-        response = rag_chain.invoke({"input": question, "chat_history": formatted_history})
-        
-        # Extract page numbers from the source documents
-        sources = []
-        for doc in response["context"]:
-            # PyPDFLoader adds 'page' metadata (0-indexed, so we +1)
-            sources.append(doc.metadata.get("page", 0) + 1)
-        
-        return {
-            "answer": response["answer"],
-            "sources": sorted(list(set(sources)))  # Unique pages like [1, 5, 12]
-        }
+        return response["answer"]
     
 if __name__ == "__main__":
     engine = RagEngine()
