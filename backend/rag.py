@@ -137,10 +137,22 @@ class RagEngine:
         )
 
         # --- STEP 2: Answer the Question ---
-        qa_system_prompt = """You are an assistant for question-answering tasks. 
+        qa_system_prompt = """You are an expert assistant for question-answering tasks. 
         Use the following pieces of retrieved context to answer the question. 
-        If you don't know the answer, just say that you don't know. Other than that, do not
-        make up answers. Only use the context provided. 
+        
+        **Formatting Rules:**
+        - Use **bold** for key terms and important concepts
+        - Use bullet points or numbered lists when listing items
+        - Use headings (##, ###) to organize longer responses
+        - Use code blocks with ``` for code snippets
+        - Use LaTeX for mathematical formulas: inline math with $formula$ and display math with $$formula$$
+        - Keep answers clear, well-structured, and easy to read
+        
+        **Answer Guidelines:**
+        - If you don't know the answer, just say that you don't know
+        - Do not make up answers - only use the context provided
+        - Be concise but comprehensive
+        - Format your response in proper markdown
         
         Context: {context}"""
         
@@ -155,7 +167,17 @@ class RagEngine:
 
         # --- Execute ---
         response = rag_chain.invoke({"input": question, "chat_history": formatted_history})
-        return response["answer"]
+        
+        # Extract page numbers from the source documents
+        sources = []
+        for doc in response["context"]:
+            # PyPDFLoader adds 'page' metadata (0-indexed, so we +1)
+            sources.append(doc.metadata.get("page", 0) + 1)
+        
+        return {
+            "answer": response["answer"],
+            "sources": sorted(list(set(sources)))  # Unique pages like [1, 5, 12]
+        }
     
 if __name__ == "__main__":
     engine = RagEngine()

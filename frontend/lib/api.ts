@@ -6,6 +6,7 @@ const apiClient = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  timeout: 30000, // Wait 30 seconds before failing (Render wake-up time)
 });
 
 export const uploadPDF = async (file: File) => {

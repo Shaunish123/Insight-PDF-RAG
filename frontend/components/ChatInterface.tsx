@@ -2,7 +2,10 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Send, Paperclip, Loader2, User, Bot } from "lucide-react";
-import ReactMarkdown from "react-markdown"; // <--- NEW IMPORT
+import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css"; // KaTeX CSS for math rendering
 import { uploadPDF, chatWithPDF } from "@/lib/api";
 
 interface Message {
@@ -140,11 +143,31 @@ const handleSendMessage = async () => {
                 {msg.role === "ai" ? (
                   <div className="prose prose-sm max-w-none text-gray-800 dark:text-gray-200">
                     <ReactMarkdown
+                      remarkPlugins={[remarkMath]}
+                      rehypePlugins={[rehypeKatex]}
                       components={{
                         p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
                         strong: ({node, ...props}) => <span className="font-bold text-gray-900 dark:text-white" {...props} />,
+                        em: ({node, ...props}) => <span className="italic" {...props} />,
+                        h1: ({node, ...props}) => <h1 className="text-xl font-bold mb-2 text-gray-900 dark:text-white" {...props} />,
+                        h2: ({node, ...props}) => <h2 className="text-lg font-bold mb-2 text-gray-900 dark:text-white" {...props} />,
+                        h3: ({node, ...props}) => <h3 className="text-base font-bold mb-2 text-gray-900 dark:text-white" {...props} />,
                         ul: ({node, ...props}) => <ul className="list-disc ml-4 mb-2" {...props} />,
+                        ol: ({node, ...props}) => <ol className="list-decimal ml-4 mb-2" {...props} />,
                         li: ({node, ...props}) => <li className="mb-1" {...props} />,
+                        code: ({node, className, children, ...props}) => {
+                          const isInline = !className;
+                          return isInline ? (
+                            <code className="bg-gray-200 dark:bg-gray-700 px-1 py-0.5 rounded text-sm font-mono" {...props}>
+                              {children}
+                            </code>
+                          ) : (
+                            <code className="block bg-gray-200 dark:bg-gray-700 p-2 rounded text-sm font-mono overflow-x-auto mb-2" {...props}>
+                              {children}
+                            </code>
+                          );
+                        },
+                        pre: ({node, ...props}) => <pre className="mb-2" {...props} />,
                       }}
                     >
                       {msg.content}
