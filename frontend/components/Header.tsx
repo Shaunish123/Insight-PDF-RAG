@@ -1,7 +1,6 @@
 "use client";
 
-import { FileText, Github, Upload, Info, Moon, Sun } from "lucide-react";
-import { useTheme } from "@/contexts/ThemeContext";
+import { FileText, Github, Upload, Info } from "lucide-react";
 
 interface HeaderProps {
   hasActiveFile?: boolean;
@@ -10,8 +9,6 @@ interface HeaderProps {
 }
 
 export default function Header({ hasActiveFile, onUploadNew, onAbout }: HeaderProps) {
-  const { theme, toggleTheme } = useTheme();
-  
   return (
     <header className="flex items-center justify-between px-6 py-4 bg-white dark:bg-gray-900 border-b dark:border-gray-700 shadow-sm transition-colors">
       <div className="flex items-center gap-2">
@@ -38,13 +35,6 @@ export default function Header({ hasActiveFile, onUploadNew, onAbout }: HeaderPr
             </button>
           </>
         )}
-        <button
-          onClick={toggleTheme}
-          className="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
-          aria-label="Toggle theme"
-        >
-          {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-        </button>
         <a 
           href="https://github.com" 
           target="_blank" 
