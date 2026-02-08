@@ -18,6 +18,7 @@ app.add_middleware(
         "http://localhost:3000",  # Local development
         "https://*.vercel.app",   # Vercel preview deployments
         # Add your production Vercel domain here when deployed
+        "https://insight-pdf-rag.vercel.app/"
     ],
     allow_credentials=True,
     allow_methods=["*"], # Allow all verbs (GET, POST, etc.)
