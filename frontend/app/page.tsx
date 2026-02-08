@@ -28,16 +28,6 @@ export default function Home() {
   // About modal state
   const [showAbout, setShowAbout] = useState(false);
 
-  // Show loading screen only for production (Render deployment)
-  if (!isServerReady && !isLocalDev) {
-    return (
-      <ServerLoadingScreen 
-        onServerReady={() => setIsServerReady(true)}
-        apiUrl={apiUrl}
-      />
-    );
-  }
-
   // Handle Mouse Drag for Resizing
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -98,6 +88,16 @@ export default function Home() {
     setActiveFile(undefined);
     setActiveFileUrl(null);
   };
+
+  // Show loading screen only for production (Render deployment)
+  if (!isServerReady && !isLocalDev) {
+    return (
+      <ServerLoadingScreen 
+        onServerReady={() => setIsServerReady(true)}
+        apiUrl={apiUrl}
+      />
+    );
+  }
 
   return (
     <main className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
