@@ -4,9 +4,17 @@ import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import PDFViewer from "@/components/PDFViewer";
 import ChatInterface from "@/components/ChatInterface";
+import ServerLoadingScreen from "@/components/ServerLoadingScreen";
 import { FileText, UploadCloud, X } from "lucide-react";
 
 export default function Home() {
+  // Server status state
+  const [isServerReady, setIsServerReady] = useState(false);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  
+  // Skip loading screen for local development
+  const isLocalDev = apiUrl.includes("localhost");
+
   const [activeFile, setActiveFile] = useState<File | undefined>(undefined);
   const [activeFileUrl, setActiveFileUrl] = useState<string | null>(null);
   
@@ -19,6 +27,16 @@ export default function Home() {
   
   // About modal state
   const [showAbout, setShowAbout] = useState(false);
+
+  // Show loading screen only for production (Render deployment)
+  if (!isServerReady && !isLocalDev) {
+    return (
+      <ServerLoadingScreen 
+        onServerReady={() => setIsServerReady(true)}
+        apiUrl={apiUrl}
+      />
+    );
+  }
 
   // Handle Mouse Drag for Resizing
   useEffect(() => {

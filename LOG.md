@@ -522,6 +522,62 @@ Users asking questions never know if they got the 70B or 8B response - the app j
 
 ---
 
+## [Date: 08-02-2026] - UX Enhancement: Server Heartbeat & Loading Screen
+
+**Goal:** Handle Render's cold start gracefully with an engaging loading experience.
+
+### The Problem
+Render's free tier puts the server to sleep after 15 minutes of inactivity. When users visit the deployed app, they encounter:
+- 30-50 second wait time for server wake-up
+- Confusing timeout errors if they try to upload immediately
+- No feedback about what's happening
+
+### The Solution: Smart Loading Screen with Entertainment
+
+Implemented a beautiful loading screen that monitors backend health and engages users while waiting.
+
+**New Components:**
+
+1. **Backend Health Endpoint** ([main.py](backend/main.py#L48-L54))
+   ```python
+   @app.get("/health")
+   def health_check():
+       return {"status": "healthy", "service": "InsightPDF API", "ready": True}
+   ```
+
+2. **ServerLoadingScreen Component** ([ServerLoadingScreen.tsx](frontend/components/ServerLoadingScreen.tsx))
+   - Polls `/health` endpoint every 3 seconds
+   - Shows animated loading spinner with elapsed time
+   - Displays progress bar and statistics
+   - **Features a link to my Simon Game** to play while waiting
+   - Auto-redirects when backend is ready
+   - Skipped for localhost (faster local development)
+
+3. **Main App Integration** ([page.tsx](frontend/app/page.tsx#L10-L33))
+   - Checks if API URL is localhost
+   - Shows loading screen only for production
+   - Seamless transition when server wakes up
+
+**Visual Features:**
+- 🎨 Gradient background with glassmorphism
+- ⏱️ Real-time elapsed time counter
+- 📊 Health check attempt counter
+- 📈 Animated progress bar (50s estimated)
+- 🎮 **Link to Simon Game (https://shaunish123.github.io/Simon-Game/)**
+- ✨ Auto-connects when ready
+
+**Benefits:**
+- ✅ **Better UX** - Users know what's happening
+- ✅ **Entertainment** - Link to play Simon Game while waiting
+- ✅ **No confusion** - Clear messaging about cold start
+- ✅ **Automatic** - Seamless transition to app
+- ✅ **Local dev friendly** - Skipped for localhost
+
+**User Experience:**
+Instead of staring at a loading screen, users can play the Simon Game and the app automatically loads when the backend is ready!
+
+---
+
 
 
 

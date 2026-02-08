@@ -18,7 +18,8 @@ InsightPDF allows you to upload any PDF document and have intelligent conversati
 - 📐 **LaTeX Math Rendering** - Properly formatted mathematical formulas
 - 🔄 **Auto Model Fallback** - Seamless switching between 70B and 8B models on rate limits
 - 🚀 **Fast & Accurate** - Powered by GROQ's LPU technology and Google embeddings
-- 🐳 **Docker Ready** - Fully containerized for easy deployment
+- � **Server Heartbeat Monitoring** - Smart loading screen that checks backend health and entertains users during cold starts
+- �🐳 **Docker Ready** - Fully containerized for easy deployment
 
 ---
 
@@ -61,6 +62,20 @@ User Question → History-Aware Retrieval → Top 3 Relevant Chunks
 ```
 Try Llama-3.3-70b → Rate Limit? → Auto-switch to Llama-3.1-8b → Success ✓
 ```
+
+### 4. **Server Heartbeat & Cold Start Handling**
+```
+Frontend Loads → Health Check (/health endpoint) → Server Asleep?
+→ Show Loading Screen + Simon Game Link → Poll every 3s
+→ Server Wakes Up → Auto-redirect to App ✓
+```
+
+**Features:**
+- Real-time health monitoring
+- Visual progress bar and stats (attempts, time elapsed)
+- Link to Simon Game to play while waiting
+- Automatic transition when backend is ready
+- Skipped in local development for faster debugging
 
 ---
 

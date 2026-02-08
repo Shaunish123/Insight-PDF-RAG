@@ -18,7 +18,7 @@ app.add_middleware(
         "http://localhost:3000",  # Local development
         "https://*.vercel.app",   # Vercel preview deployments
         # Add your production Vercel domain here when deployed
-        "https://insight-pdf-rag.vercel.app/"
+        "https://insight-pdf-rag.vercel.app"
     ],
     allow_credentials=True,
     allow_methods=["*"], # Allow all verbs (GET, POST, etc.)
@@ -44,6 +44,15 @@ class QueryRequest(BaseModel):
 def home():
     """Check to see if server running"""
     return {"status": "Alive", "message": "Welcome to InsightPDF"}
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint for frontend heartbeat monitoring"""
+    return {
+        "status": "healthy",
+        "service": "InsightPDF API",
+        "ready": True
+    }
 
 
 @app.post("/upload")
